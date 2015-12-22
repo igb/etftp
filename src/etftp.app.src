@@ -1,0 +1,15 @@
+{application, etftp,
+ [
+  {description, "A TFTP server impl in Erlang."},
+  {vsn, "1"},
+  {modules, [
+             etftp
+            ]},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, { etftp_app, []}},
+  {env, []}
+ ]}.
