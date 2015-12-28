@@ -1,6 +1,6 @@
 -module(etftp).
 
--export([tftp_server_start/0,handle_packet/1]).
+-export([tftp_server_start/0,listen/1,handle_message/4]).
 
 
 tftp_server_start() ->
@@ -8,40 +8,44 @@ tftp_server_start() ->
      listen(Socket).
 
 listen(Socket) ->
-    {ok, {_,_,Packet}}=gen_udp:recv(Socket, 0),
-    spawn(?MODULE, handle_packet, [Packet]),
-    listen(Socket).
+    {ok, {Address,Port,Packet}}=gen_udp:recv(Socket, 0),
+    spawn(?MODULE, handle_message, [Socket, Address, Port, Packet]),
+    ?MODULE:listen(Socket).
 
 
-handle_packet(Packet)->
+handle_message(Socket, Address, Port, Packet)->
 	
   io:format("Packet: ~p~n", [Packet]),
   <<Opcode:16,Body/binary>> = Packet,
     io:format("Op: ~p~n", [Opcode]),
     case Opcode of
-    	 1 -> handle_read(Body);
-	 2 -> handle_write(Body);
-	 3 -> handle_data(Body);
-	 4 -> handle_ack(Body);
-	 5 -> handle_error(Body)
+    	 1 -> handle_read(Socket, Address, Port, Body);
+	 2 -> handle_write(Socket, Address, Port, Body);
+	 3 -> handle_data(Socket, Address, Port, Body);
+	 4 -> handle_ack(Socket,Address, Port,Body);
+	 5 -> handle_error(Socket,Address, Port, Body)
     end.
 
 
-handle_read(Body)->
-  Rrq = parse_rq(Body).
+handle_read(Socket, Address, Port, Body)->
+  Rrq = parse_rq(Body),
+  send_error(Socket, Address, Port, <<0:16>>, "Unsupported operation.").
 
-handle_write(Body)->
+handle_write(Socket, Address, Port, Body)->
   Wrq = parse_rq(Body).
 
-handle_data(Body)->
+handle_data(Socket, Address, Port, Body)->
  ok.
 
-handle_ack(Body)->
+handle_ack(Socket, Address, Port, Body)->
  ok.
 
-handle_error(Body)->
- ok.
+handle_error(Socket, Address, Port, Body)->
+  send_error(Socket, Address, Port, <<0:16>>, "Unsupported operation.").
 
+send_error(Socket, Address, Port, ErrorCode, ErrorMessage)->
+   BinaryMessage = binary:list_to_bin(ErrorMessage),
+   gen_udp:send(Socket, Address, Port, <<5:16,ErrorCode/binary, BinaryMessage/binary, 0>>).
 
 parse_rq(Body)->
  {FileEnd,_} = binary:match(Body, <<0>>),
