@@ -36,8 +36,14 @@ handle_read(Socket, Address, Port, Body, AvailableFiles)->
   File = lists:keyfind(binary:bin_to_list(FileName), 1, AvailableFiles),
   case File of 
        false -> send_error(Socket, Address, Port, <<1:16>>, "File not found.");
-       _ -> send_error(Socket, Address, Port, <<0:16>>, "Unsupported operation.")
+       {_, FullPath} -> send_file(Socket, Address, Port, FullPath)
   end.
+
+send_file(Socket, Address, Port, FullPath)->
+	{ok, FileDevice} = file:open(FullPath, [binary]),
+        {ok, Data}=file:read(FileDevice, 512),
+	io:format("~p~n", [Data]),
+	gen_udp:send(Socket, Address, Port, <<3:16,1:16, Data/binary>>).
 
 handle_write(Socket, Address, Port, Body)->
   Wrq = parse_rq(Body).
